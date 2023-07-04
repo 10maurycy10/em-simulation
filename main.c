@@ -1,8 +1,8 @@
 #include "render.h"
 #include "math.h"
 
-#define ELEMENTS_H 200
-#define ELEMENTS_W 200
+#define ELEMENTS_H 3
+#define ELEMENTS_W 3
 
 #define ELEMENTS_PITCH 0.1
 
@@ -21,7 +21,13 @@
 // dE.x / dt = dB / dy
 // dB / dt = dE.x / dy - dE.y / dx (this part is actualy the 2d curl of the electric feild :) )
 
-// Electric and magnetic feilds
+
+// Electric and magnetic feilds are stagarded for efficency:
+// E   E
+//   B   B
+// E   E
+//   B   B
+
 v2 feild_j[ELEMENTS_W][ELEMENTS_H];
 v2 feild_e[ELEMENTS_W][ELEMENTS_H];
 v2 feild_e_new[ELEMENTS_W][ELEMENTS_H];
@@ -52,31 +58,45 @@ void do_em_at(float dt, int x, int y) {
 
 	// Compute all the necicary diriveratives
 	// These are computed from the point of view of the other feild
-	float dB_dx = (get_b_feild(x + 1, y) - get_b_feild(x - 1, y)) / ELEMENTS_PITCH / 2;
-	float dB_dy = (get_b_feild(x, y + 1) - get_b_feild(x, y - 1)) / ELEMENTS_PITCH / 2;
+	// A point on the electric feild grid is surronded by points on the magnetic from x-1 to x and y-1 to y
+	float dB_dx_1 = (get_b_feild(x, y) - get_b_feild(x - 1, y)) / ELEMENTS_PITCH;
+	float dB_dx_0 = (get_b_feild(x, y - 1) - get_b_feild(x - 1, y - 1)) / ELEMENTS_PITCH;
+	float dB_dx = (dB_dx_1 + dB_dx_0) / 2;
+	
+	float dB_dy_1 = (get_b_feild(x, y) - get_b_feild(x, y - 1)) / ELEMENTS_PITCH;
+	float dB_dy_0 = (get_b_feild(x - 1, y) - get_b_feild(x - 1, y - 1)) / ELEMENTS_PITCH;
+	float dB_dy = (dB_dy_1 + dB_dy_0) / 2;
 
-	float dEx_dy = (get_e_feild(x, y + 1).x - get_e_feild(x, y - 1).x) / ELEMENTS_PITCH / 2;
-	float dEy_dx = (get_e_feild(x + 1, y).y - get_e_feild(x - 1, y).y) / ELEMENTS_PITCH / 2;
+	// A point on the magnetic is surrounded by points on the electric from x to x+1 and y to y+1
+	float dEx_dy_0 = (get_e_feild(x, y + 1).x - get_e_feild(x, y).x) / ELEMENTS_PITCH;
+	float dEx_dy_1 = (get_e_feild(x + 1, y + 1).x - get_e_feild(x + 1, y).x) / ELEMENTS_PITCH;
+	float dEx_dy = (dEx_dy_0 + dEx_dy_1) / 2;
 
-	// Compute the diriverative of the electric and magnetic feilds
-	v2 dE_dt = {.x = dB_dy - J.x, .y = -dB_dx - J.y};
-	float dB_dt = dEx_dy - dEy_dx;
+	float dEy_dx_0 = (get_e_feild(x + 1, y).y - get_e_feild(x, y).y) / ELEMENTS_PITCH;
+	float dEy_dx_1 = (get_e_feild(x + 1, y + 1).y - get_e_feild(x, y + 1).y) / ELEMENTS_PITCH;
+	float dEy_dx = (dEy_dx_0 + dEy_dx_1) / 2;
+
+	// Compute the diriverative of the electric and magnetic feilds over time
+	v2 dE_dt = {.x = dB_dy - J.x, .y = dB_dx - J.y};
+	float dB_dt = -dEx_dy + dEy_dx;
 
 	// Apply it.
-	feild_e[x][y] = v2_add(feild_e[x][y], v2_mul_scaler(dE_dt, dt));
-	feild_b[x][y] = feild_b[x][y] + dB_dt * dt;
+	feild_e_new[x][y] = v2_add(feild_e[x][y], v2_mul_scaler(dE_dt, dt));
+	feild_b_new[x][y] = feild_b[x][y] + dB_dt * dt;
 }
 
 void do_em(float dt) {
+	// Compute the new feild values
 	for (int x = 0; x < ELEMENTS_W; x++) {
 		for (int y = 0; y < ELEMENTS_H; y++) {
 			do_em_at(dt, x, y);
 		}
 	}
+	// Update the current field with the newly computed one
 	for (int x = 0; x < ELEMENTS_W; x++) {
 		for (int y = 0; y < ELEMENTS_H; y++) {
-	//		feild_e[x][y] = feild_e_new[x][y];
-	//		feild_b[x][y] = feild_b_new[x][y];
+			feild_e[x][y] = feild_e_new[x][y];
+			feild_b[x][y] = feild_b_new[x][y];
 		}
 	}
 }
@@ -134,6 +154,7 @@ int main(int argc, char** argv) {
 		}
 	}
 
+	feild_j[1][1].y = .1;
 
 	float t = 0;	
 	float dt = 1.0/60;
@@ -144,12 +165,6 @@ int main(int argc, char** argv) {
 		do_em(dt);
 		t += dt;
 	
-		if ((int)(t * 1)%2 == 0) {
-			feild_j[100][100].y = 5;
-		} else {
-			feild_j[100][100].y = -5;
-		}
-		
 		renderer_setup(&window, ELEMENTS_H, ELEMENTS_W);
 	
 		SDL_FillRect(window.canvas, NULL, 0xff00ffff);
