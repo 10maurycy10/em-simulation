@@ -1,8 +1,8 @@
 #include "render.h"
 #include "math.h"
 
-#define ELEMENTS_H 200
-#define ELEMENTS_W 200
+#define ELEMENTS_H 16
+#define ELEMENTS_W 16
 
 #define ELEMENTS_PITCH 0.1
 
@@ -21,11 +21,23 @@
 // dE.x / dt = dB / dy
 // dB / dt = dE.x / dy - dE.y / dx (this part is actualy the 2d curl of the electric feild :) )
 
+// Stagered feild representation
+
+//-------+--------+
+//     Ex|      Ex|
+//       |        |
+// Ey  B | Ey   B |
+//-------+--------|
+//     Ex|      Ex|
+//       |        |
+// Ey  B | Ey   B |
+//-------+--------+
+
 // Electric and magnetic feilds
 v2 feild_j[ELEMENTS_W][ELEMENTS_H];
 v2 feild_e[ELEMENTS_W][ELEMENTS_H];
-v2 feild_e_new[ELEMENTS_W][ELEMENTS_H];
 float feild_b[ELEMENTS_W][ELEMENTS_H];
+v2 feild_e_new[ELEMENTS_W][ELEMENTS_H];
 float feild_b_new[ELEMENTS_W][ELEMENTS_H];
 
 // Simple boundry conditions, electic feild is always zero outside of simulation
@@ -48,23 +60,26 @@ float get_b_feild(int x, int y) {
 
 // Discrete integration of a 2d generalization of maxwells equasions
 void do_em_at(float dt, int x, int y) {
-	v2 J = feild_j[x][y];
+	v2 J = {0.0, 0.0};//feild_j[x][y];
 
-	// Compute all the necicary diriveratives
-	// These are computed from the point of view of the other feild
-	float dB_dx = (get_b_feild(x + 1, y) - get_b_feild(x - 1, y)) / ELEMENTS_PITCH / 2;
-	float dB_dy = (get_b_feild(x, y + 1) - get_b_feild(x, y - 1)) / ELEMENTS_PITCH / 2;
+	// From the point of view of the E feild, y component
+	float dB_dx = (get_b_feild(x, y) - get_b_feild(x - 1, y)) / ELEMENTS_PITCH;
+	// and the x component
+	float dB_dy = (get_b_feild(x, y) - get_b_feild(x, y - 1)) / ELEMENTS_PITCH;
 
-	float dEx_dy = (get_e_feild(x, y + 1).x - get_e_feild(x, y - 1).x) / ELEMENTS_PITCH / 2;
-	float dEy_dx = (get_e_feild(x + 1, y).y - get_e_feild(x - 1, y).y) / ELEMENTS_PITCH / 2;
+	// From the point of view of the B feild
+	float dEx_dy = (get_e_feild(x, y + 1).x - get_e_feild(x, y).x) / ELEMENTS_PITCH;
+	float dEy_dx = (get_e_feild(x + 1, y).y - get_e_feild(x, y).y) / ELEMENTS_PITCH;
 
 	// Compute the diriverative of the electric and magnetic feilds
-	v2 dE_dt = {.x = dB_dy - J.x, .y = -dB_dx - J.y};
-	float dB_dt = dEx_dy - dEy_dx;
+	v2 dE_dt = {.x = dB_dy - J.x, .y = dB_dx - J.y};
+	float dB_dt = -dEx_dy + dEy_dx;//-(dEx_dy - dEy_dx);//-dEx_dy + dEy_dx;
 
+	printf("%d %d: dB/dy: %f, dB/dx: %f -> dE/dt = (%f %f)\n",x, y, dB_dy, dB_dx, dE_dt.x, dE_dt.y);
+	
 	// Apply it.
-	feild_e[x][y] = v2_add(feild_e[x][y], v2_mul_scaler(dE_dt, dt));
-	feild_b[x][y] = feild_b[x][y] + dB_dt * dt;
+	feild_e_new[x][y] = v2_add(feild_e[x][y], v2_mul_scaler(dE_dt, dt));
+	feild_b_new[x][y] = feild_b[x][y] + dB_dt * dt;
 }
 
 void do_em(float dt) {
@@ -75,8 +90,8 @@ void do_em(float dt) {
 	}
 	for (int x = 0; x < ELEMENTS_W; x++) {
 		for (int y = 0; y < ELEMENTS_H; y++) {
-	//		feild_e[x][y] = feild_e_new[x][y];
-	//		feild_b[x][y] = feild_b_new[x][y];
+			feild_e[x][y] = feild_e_new[x][y];
+			feild_b[x][y] = feild_b_new[x][y];
 		}
 	}
 }
@@ -87,13 +102,13 @@ void do_em(float dt) {
 
 v2 e_feild_to_color(v2 e) {
 	return (v2) {
-		.x = (e.x*5 + 1) * 128,
-		.y = (e.y*5 + 1) * 128 
+		.x = (e.x*1 + 1) * 128,
+		.y = (e.y*1 + 1) * 128 
 	};
 }
 
 int b_feild_to_color(float b) {
-	return (b*5 + 1) * 128;
+	return (b*1 + 1) * 128;
 }
 
 // Clamp to alowable range for 8 bit colors
@@ -134,6 +149,8 @@ int main(int argc, char** argv) {
 		}
 	}
 
+	feild_b[8][8] = .1;
+
 
 	float t = 0;	
 	float dt = 1.0/60;
@@ -142,13 +159,6 @@ int main(int argc, char** argv) {
 		do_input();	
 		
 		do_em(dt);
-		t += dt;
-	
-		if ((int)(t * 1)%2 == 0) {
-			feild_j[100][100].y = 5;
-		} else {
-			feild_j[100][100].y = -5;
-		}
 		
 		renderer_setup(&window, ELEMENTS_H, ELEMENTS_W);
 	
