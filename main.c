@@ -2,7 +2,7 @@
 #include "math.h"
 
 #define ELEMENTS_H 64
-#define ELEMENTS_W 64
+#define ELEMENTS_W 128
 
 #define ELEMENTS_PITCH 0.1
 
@@ -28,6 +28,9 @@
 
 // Each cell in the grid has a B field value and and 2 E field comonents.
 // These values are stagered in space to allow computing the needed diriverates easly
+
+// Buffer for conductivity data
+float feild_conductivity[ELEMENTS_W][ELEMENTS_H];
 
 // Buffer for current flowing through every part of the simulation
 v2 feild_j[ELEMENTS_W][ELEMENTS_H];
@@ -104,6 +107,12 @@ void simulate_em(float dt) {
 			feild_b[x][y] = feild_b_next[x][y];
 		}
 	}
+	// This is at the end so that other code can modify the current
+	for (int x = 0; x < ELEMENTS_W; x++) {
+		for (int y = 0; y < ELEMENTS_H; y++) {
+			feild_j[x][y] = v2_mul_scaler(feild_e[x][y], feild_conductivity[x][y]);
+		}
+	}
 }
 
 ///////////////
@@ -114,31 +123,63 @@ typedef struct RGB {
 	int r,g,b;
 } RGB;
 
-v2 e_feild_to_color(v2 e) {
-	return (v2) {
-		.x = (e.x*10 + 1) * 128,
-		.y = (e.y*10 + 1) * 128
+
+float color_scale = 50;
+
+RGB colorgrade_em(int x, int y) {
+	// A simple colorgrading that shows the electric and magnetic fields
+	return (RGB) {
+		.r = (feild_e[x][y].x*color_scale + 1) * 128,
+		.g = (feild_e[x][y].y*color_scale + 1) * 128,
+		.b = (feild_b[x][y]  *color_scale + 1) * 128
 	};
 }
 
-int b_feild_to_color(float b) {
-	return (b*10 + 1) * 128;
-}
-/*
-RGB colorgrade_em(int x, int y) {
+RGB colorgrade_m(int x, int y) {
+	// Shows the magnetic feild
 	return (RGB) {
-		.r = feild_e[],
-		.g = ,
-		.b = 
-	}
+		.r =  feild_b[x][y] * color_scale * 255,
+		.g = 0,
+		.b = -feild_b[x][y] * color_scale * 255
+	};
 }
-*/
+
+RGB colorgrade_total_current(int x, int y) {
+	// Shows the current (in conductors) and charge gradients
+	float total = v2_length(feild_j[x][y]);
+
+	float dEy_dy = (get_e_feild(x, y + 1).y - get_e_feild(x, y).y)/ELEMENTS_PITCH;
+	float dEx_dx = (get_e_feild(x + 1, y).x - get_e_feild(x, y).x)/ELEMENTS_PITCH;
+
+	return (RGB) {
+		.r =  total * color_scale * 255,
+		.g =  dEy_dy * color_scale * 255,
+		.b =  dEx_dx * color_scale * 255,
+	};
+}
+
+RGB colorgrade_total_em(int x, int y) {
+	float e = v2_length(feild_e[x][y]);
+	float b = fabs(feild_b[x][y]);
+	e = sqrt(e);
+	b = sqrt(b);
+
+	return (RGB) {
+		.r =  b * color_scale * 255,
+		.g =  e * color_scale * 255,
+		.b =  0,
+	};
+}
+
+#define COLORGRADE colorgrade_total_em
+
 // Clamp to alowable range for 8 bit colors
 int clamp_to_rgb(int c) {
 	if (c < 0) return 0;
 	if (c > 255) return 255;
 	return c;
 }
+
 
 /////////////
 // UI code //
@@ -168,10 +209,24 @@ int main(int argc, char** argv) {
 			feild_e[x][y] = (v2) {.x = 0, .y = 0};
 			feild_b[x][y] = 0.0;
 			feild_j[x][y] = (v2) {.x = 0, .y = 0};
+			feild_conductivity[x][y] = 0;
 		}
 	}
-
-	feild_j[1][1].y = .1;
+	
+	for (int y = 0; y < ELEMENTS_H; y++) {
+		feild_conductivity[32][y] = 100;
+		feild_conductivity[31][y] = 100;
+	}
+	
+	feild_conductivity[32][24] = 0;
+	feild_conductivity[32][25] = 0;
+	feild_conductivity[31][24] = 0;
+	feild_conductivity[31][25] = 0;
+	
+	feild_conductivity[32][43] = 0;
+	feild_conductivity[32][42] = 0;
+	feild_conductivity[31][43] = 0;
+	feild_conductivity[31][42] = 0;
 
 	float t = 0;	
 	float dt = 1.0/60;
@@ -179,25 +234,29 @@ int main(int argc, char** argv) {
 		// Handle inputs
 		do_input();	
 		
-		simulate_em(dt);
+		simulate_em(dt/3);
+		simulate_em(dt/3);
+		simulate_em(dt/3);
 		t += dt;
 	
+		feild_conductivity[16][31] = 100;
+		feild_conductivity[16][32] = 100;
+		feild_conductivity[16][33] = 100;
 		if ((int)(t * 5) % 2) {
-			feild_j[32][32].y = 1;
+			feild_j[16][32].y = 1;
 		} else {
-			feild_j[32][32].y = -1;
+			feild_j[16][32].y = -1;
 		}
 		
-		renderer_setup(&window, ELEMENTS_H, ELEMENTS_W);
+		renderer_setup(&window, ELEMENTS_W, ELEMENTS_H);
 	
 		SDL_FillRect(window.canvas, NULL, 0xff00ffff);
 
 		SDL_LockSurface(window.canvas);
 		for (int x = 0; x < ELEMENTS_W; x++) {
 			for (int y = 0; y < ELEMENTS_H; y++) {
-				v2 e = e_feild_to_color(feild_e[x][y]);
-				float b = b_feild_to_color(feild_b[x][y]);
-				set_pixel(&window, x, y, clamp_to_rgb(e.x), clamp_to_rgb(e.y), clamp_to_rgb(b));
+				RGB c = COLORGRADE(x,y);
+				set_pixel(&window, x, y, clamp_to_rgb(c.r), clamp_to_rgb(c.g), clamp_to_rgb(c.b));
 			}
 		}
 
