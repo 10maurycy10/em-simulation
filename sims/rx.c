@@ -82,7 +82,7 @@ int main(int argc, char** argv) {
 		if (DETUNE) {
 			freqency = 9 / PI;
 		} else {
-			freqency = 4.5 / PI;
+			freqency = 6 / PI;
 		}
 		
 		w.field_j[exitation_x][exitation_y].y = sin(freqency * t);
