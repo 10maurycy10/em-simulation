@@ -13,3 +13,5 @@ Under linux, use the build script `./build.sh` that takes a file in `./sims` as 
 ## Current Simulations
 
 - `./sims/doubleslit.c` This is the clasic double slit experiment.
+- `./sims/tuned.c` A simulation of a tuned circuit.
+- `./sims/rx.c` A simulation of a tuned circuit filtering a signal.
