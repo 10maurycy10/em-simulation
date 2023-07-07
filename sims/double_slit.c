@@ -1,6 +1,5 @@
-
-#include "maxwell.h"
-#include "render.h"
+#include "../maxwell.h"
+#include "../render.h"
 
 #define SUBSTEPS 10
 

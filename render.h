@@ -17,7 +17,7 @@ typedef struct Window {
 } Window;
 
 // Open a window an create a Window stuct
-Window window_open();
+Window window_open(int w, int h);
 
 // (re)prepare a buffer for rendering, does nothing if it is already initalized at the same resolution
 void renderer_setup(Window* window, int w, int h);
@@ -26,4 +26,7 @@ void renderer_setup(Window* window, int w, int h);
 void window_present(Window* window);
 
 void set_pixel(Window* window, int x, int y, int r, int g, int b);
+
+// Placeholder input handling function
+void do_input(Window* window);
 
