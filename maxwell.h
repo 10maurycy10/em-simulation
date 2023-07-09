@@ -31,8 +31,10 @@ typedef struct World {
 	// Scale factor for built in color grading
 	float color_scale;
 
-	// Buffer for conductivity data
-	float** field_conductivity;
+	// Material data
+	float** permittivity; 
+	float** permeability;
+	float** conductivity;
 
 	// Buffer for current flowing through every part of the simulation
 	v2** field_j;

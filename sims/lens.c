@@ -1,34 +1,40 @@
 #include "../maxwell.h"
 #include "../render.h"
 
-#define SUBSTEPS 10
+#define SUBSTEPS 9
+//#define IOR 1.1
+#define IOR 1.33
+//#define IOR 1.52
+//#define IOR 2.417
+//#define IOR 0.5
 
-#define COLOR_SCALE 500*4
+// IOR = sqrt( relperm * relpermit )
+// relperm ~= 1 for most lense materials
+// IOR = sqrt( relpermit )
+// IOR^2 = repermit
+// permit = IOR^2 * permit_of_free_space
 
-////////////////
-// Simulation //
-////////////////
-
-// dE.y / dt = -dB / dx
-// dE.x / dt = dB / dy
-// dB / dt = dE.x / dy - dE.y / dx (this part is actualy the 2d curl of the electric feild :) )
-
-/////////////
-// UI code //
-/////////////
-
+// IOR Values:
+//	1 = vacuum
+//	1 ~= most gasses
+// 	1.333 = water @ 20c
+// 	1.31 = ice
+//	1.52 = typical glass
+//	1.77 = Saphire
+//	2.15 = CZ
+//	2.417 = diamnd
 
 int main(int argc, char** argv) {
 	// Open a window
-	Window window = window_open(1000, 600);
+	Window window = window_open(2000, 1500);
 	
-	World w = empty_world(100, 60, 0.1);
-	w.color_scale = 2000;
+	World w = empty_world(720, 1280, 0.1);
+	w.color_scale = 500;
 	
 	// Absorbing bounries	
 	for (int y = 0; y < w.h; y++) {
 		for (int dx = 0; dx < 6; dx++) {
-			w.conductivity[dx][y] = 6;
+		//	w.conductivity[dx][y] = 6;
 			w.conductivity[w.w-dx-1][y] = 6;
 		}
 	}
@@ -40,23 +46,15 @@ int main(int argc, char** argv) {
 		}
 	}
 	
-	// Setup the double slits
+	// Add circular lens
 	for (int y = 0; y < w.h; y++) {
-		w.conductivity[32][y] = 500;
-		w.conductivity[31][y] = 500;
+		for (int x = 0; x < w.w; x++) {
+			if (v2_length((v2) {.x = x - w.w/3, .y = y - w.h/2}) < 40 ) {
+				w.permittivity[x][y] *= IOR * IOR;
+			}
+		}
 	}
 	
-	// Add the slits themselves
-	w.conductivity[32][24] = 0;
-	w.conductivity[32][25] = 0;
-	w.conductivity[31][24] = 0;
-	w.conductivity[31][25] = 0;
-	
-	w.conductivity[32][43] = 0;
-	w.conductivity[32][42] = 0;
-	w.conductivity[31][43] = 0;
-	w.conductivity[31][42] = 0;
-
 	float t = 0;	
 	float dt = 1.0/60;
 	while (1) {
@@ -69,7 +67,11 @@ int main(int argc, char** argv) {
 		}
 
 		// Add current to exite em waves
-		w.field_j[16][32].y = sin(t*10);
+		if (t < 1) {
+			for (int y = 0; y < w.h; y++) {
+				w.field_j[0][y].y = sin(t*5)/10;
+			}
+		}
 		
 		renderer_setup(&window, w.w, w.h);
 	
@@ -77,6 +79,7 @@ int main(int argc, char** argv) {
 		for (int x = 0; x < w.w; x++) {
 			for (int y = 0; y < w.h; y++) {
 				RGB c = colorgrade_em(&w, x,y);
+				c.r *= w.permittivity[x][y];
 				set_pixel(&window, x, y, clamp_to_rgb(c.r), clamp_to_rgb(c.g), clamp_to_rgb(c.b));
 			}
 		}

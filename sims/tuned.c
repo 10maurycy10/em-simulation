@@ -28,15 +28,15 @@ int main(int argc, char** argv) {
 	// Absorbing bounries	
 	for (int y = 0; y < w.h; y++) {
 		for (int dx = 0; dx < 6; dx++) {
-			w.field_conductivity[dx][y] = 6;
-			w.field_conductivity[w.w-dx-1][y] = 6;
+			w.conductivity[dx][y] = 6;
+			w.conductivity[w.w-dx-1][y] = 6;
 		}
 	}
 
 	for (int x = 0; x < w.w; x++) {
 		for (int dy = 0; dy < 6; dy++) {
-			w.field_conductivity[x][dy] = 6;
-			w.field_conductivity[x][w.h-dy-1] = 6;
+			w.conductivity[x][dy] = 6;
+			w.conductivity[x][w.h-dy-1] = 6;
 		}
 	}
 
@@ -47,23 +47,23 @@ int main(int argc, char** argv) {
 
         // Horizontal wires
         for (int dx = -10; dx <= 10; dx++) {
-                w.field_conductivity[center_x-dx][center_y-10] = wire;
-                w.field_conductivity[center_x-dx][center_y+10] = wire;
+                w.conductivity[center_x-dx][center_y-10] = wire;
+                w.conductivity[center_x-dx][center_y+10] = wire;
         }
 
         // Vertical wires
         for (int dy = -10; dy <= 10; dy++) {
-                w.field_conductivity[center_x-10][center_y-dy] = wire;
-                w.field_conductivity[center_x+10][center_y-dy] = wire;
+                w.conductivity[center_x-10][center_y-dy] = wire;
+                w.conductivity[center_x+10][center_y-dy] = wire;
         }
 
         // Capacitor gap
-        w.field_conductivity[center_x+10][center_y-0] = 0;
+        w.conductivity[center_x+10][center_y-0] = 0;
 
         // Capacitor plates
         for (int dx = 7; dx <= 13; dx++) {
-                w.field_conductivity[center_x+dx][center_y+1] = wire;
-                w.field_conductivity[center_x+dx][center_y-1] = wire;
+                w.conductivity[center_x+dx][center_y+1] = wire;
+                w.conductivity[center_x+dx][center_y-1] = wire;
         }
 
         int exitation_x = center_x+10;

@@ -11,25 +11,38 @@ World empty_world(int width, int h, float spacing) {
 
 	w.color_scale = 1000;
 
+	// Fields
 	w.field_e = malloc(sizeof(*w.field_e) * width);
 	w.field_b = malloc(sizeof(*w.field_b) * width);
 	w.field_e_next = malloc(sizeof(*w.field_e) * width);
 	w.field_b_next = malloc(sizeof(*w.field_b) * width);
 	w.field_j = malloc(sizeof(*w.field_j) * width);
-	w.field_conductivity = malloc(sizeof(*w.field_conductivity) * width);
+
+	// Materials
+	w.conductivity = malloc(sizeof(*w.conductivity) * width);
+	w.permittivity = malloc(sizeof(*w.permittivity) * width);
+	w.permeability = malloc(sizeof(*w.permeability) * width);
 	for (int x = 0; x < width; x++) {
+		// Fields
 		w.field_e[x] = malloc(sizeof(**w.field_e) * h);
 		w.field_b[x] = malloc(sizeof(**w.field_b) * h);
 		w.field_e_next[x] = malloc(sizeof(**w.field_e) * h);
 		w.field_b_next[x] = malloc(sizeof(**w.field_b) * h);
 		w.field_j[x] = malloc(sizeof(**w.field_j) * h);
-		w.field_conductivity[x] = malloc(sizeof(**w.field_conductivity) * h);
+		// Materials
+		w.conductivity[x] = malloc(sizeof(**w.conductivity) * h);
+		w.permeability[x] = malloc(sizeof(**w.permeability) * h);
+		w.permittivity[x] = malloc(sizeof(**w.permittivity) * h);
 
 		for (int y = 0; y < h; y++) {
+			// Fields
 			w.field_e[x][y] = (v2) {0, 0}; 
 			w.field_j[x][y] = (v2) {0, 0};
 			w.field_b[x][y] = 0;
-			w.field_conductivity[x][y] = 0;
+			// Materials
+			w.conductivity[x][y] = 0;
+			w.permittivity[x][y] = 1;
+			w.permeability[x][y] = 1;
 		}
 	}
 	return w;
@@ -42,14 +55,18 @@ void free_room(World w) {
 		free(w.field_j[x]);
 		free(w.field_b[x]);
 		free(w.field_b_next[x]);
-		free(w.field_conductivity[x]);
+		free(w.conductivity[x]);
+		free(w.permeability[x]);
+		free(w.permittivity[x]);
 	}
 	free(w.field_e);
 	free(w.field_e_next);
 	free(w.field_j);
 	free(w.field_b);
 	free(w.field_b_next);
-	free(w.field_conductivity);
+	free(w.conductivity);
+	free(w.permittivity);
+	free(w.permeability);
 }
 
 // Simple boundry conditions, E and B fields are always zero outside of simulation
@@ -68,6 +85,10 @@ float get_b_field(World* w, int x, int y) {
 		return 0;
 	}
 }
+// Curl(B) = permiability * ( J + permitivity * dE/dt)
+// Curl(B) / permiability = J + permitiviity * dE/dt
+// (Curl(B) / permiability) - J = permitiviity * dE/dt
+// ((Curl(B) / permiability) - J)/permitivity = dE/dt
 
 // Wire the next field state to the next buffer at the given location
 void calculate_ex_at(World* w, float dt, int x, int y) {
@@ -75,7 +96,7 @@ void calculate_ex_at(World* w, float dt, int x, int y) {
 
 	float dB_dy = (get_b_field(w, x, y) - get_b_field(w, x, y - 1)) / w->spacing;
 
-	float dEx_dt = dB_dy - J.x;
+	float dEx_dt = (dB_dy/w->permeability[x][y] - J.x)/w->permittivity[x][y];
 	
 	w->field_e_next[x][y].x = w->field_e[x][y].x + dEx_dt * dt;
 }
@@ -84,7 +105,7 @@ void calculate_ey_at(World* w, float dt, int x, int y) {
 
 	float dB_dx = (get_b_field(w, x, y) - get_b_field(w, x - 1, y)) / w->spacing;
 
-	float dEy_dt = -dB_dx - J.y;
+	float dEy_dt = (-dB_dx/w->permeability[x][y] - J.y)/w->permittivity[x][y];
 	
 	w->field_e_next[x][y].y = w->field_e[x][y].y + dEy_dt * dt;
 }
@@ -94,7 +115,7 @@ void calculate_b_at(World* w, float dt, int x, int y) {
 	float dEx_dy = (get_e_field(w, x, y + 1).x - get_e_field(w, x, y).x) / w->spacing;
 	float dEy_dx = (get_e_field(w, x + 1, y).y - get_e_field(w, x, y).y) / w->spacing;
 	
-	float dB_dt = +dEx_dy - dEy_dx;
+	float dB_dt = (+dEx_dy - dEy_dx);
 	
 	w->field_b_next[x][y] = w->field_b[x][y] + dB_dt * dt;
 }
@@ -121,7 +142,7 @@ void simulate_em(World* w, float dt) {
 	// Ohms law, this is at the end so that other code can modify currents during a step
 	for (int x = 0; x < w->w; x++) {
 		for (int y = 0; y < w->h; y++) {
-			w->field_j[x][y] = v2_mul_scaler(w->field_e[x][y], w->field_conductivity[x][y]);
+			w->field_j[x][y] = v2_mul_scaler(w->field_e[x][y], w->conductivity[x][y]);
 		}
 	}
 }

@@ -5,14 +5,6 @@
 
 #define COLOR_SCALE 500*4
 
-////////////////
-// Simulation //
-////////////////
-
-// dE.y / dt = -dB / dx
-// dE.x / dt = dB / dy
-// dB / dt = dE.x / dy - dE.y / dx (this part is actualy the 2d curl of the electric feild :) )
-
 /////////////
 // UI code //
 /////////////
@@ -22,7 +14,7 @@ int main(int argc, char** argv) {
 	// Open a window
 	Window window = window_open(1000, 600);
 	
-	World w = empty_world(100, 60, 0.1);
+	World w = empty_world(100, 100, 0.1);
 	w.color_scale = 2000;
 	
 	// Absorbing bounries	
@@ -40,23 +32,6 @@ int main(int argc, char** argv) {
 		}
 	}
 	
-	// Setup the double slits
-	for (int y = 0; y < w.h; y++) {
-		w.conductivity[32][y] = 500;
-		w.conductivity[31][y] = 500;
-	}
-	
-	// Add the slits themselves
-	w.conductivity[32][24] = 0;
-	w.conductivity[32][25] = 0;
-	w.conductivity[31][24] = 0;
-	w.conductivity[31][25] = 0;
-	
-	w.conductivity[32][43] = 0;
-	w.conductivity[32][42] = 0;
-	w.conductivity[31][43] = 0;
-	w.conductivity[31][42] = 0;
-
 	float t = 0;	
 	float dt = 1.0/60;
 	while (1) {
@@ -69,7 +44,7 @@ int main(int argc, char** argv) {
 		}
 
 		// Add current to exite em waves
-		w.field_j[16][32].y = sin(t*10);
+		if (t < 1) for (int y = 45; y <= 55; y++) w.field_j[50][y].y = 0.1;
 		
 		renderer_setup(&window, w.w, w.h);
 	
