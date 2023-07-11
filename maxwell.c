@@ -5,6 +5,7 @@
 World empty_world(int width, int h, float spacing) {
 	World w;
 
+	w.sync = 0;
 	w.w = width;
 	w.h = h;
 	w.spacing = spacing;
@@ -121,23 +122,43 @@ void calculate_b_at(World* w, float dt, int x, int y) {
 }
 
 void simulate_em(World* w, float dt) {
-	for (int x = 0; x < w->w; x++) {
-		for (int y = 0; y < w->h; y++) {
-			// FIXME This breaks when fully syncronus, why?
-			calculate_ex_at(w, dt, x, y);
-			calculate_ey_at(w, dt, x, y);
-			w->field_e[x][y] = w->field_e_next[x][y];
-			calculate_b_at(w, dt, x, y);
-			w->field_b[x][y] = w->field_b_next[x][y];
+	if (w->sync) {
+		// Stager updates to improve stability
+		// Update the magnetic fidld
+		for (int x = 0; x < w->w; x++) {
+			for (int y = 0; y < w->h; y++) {
+				calculate_b_at(w, dt, x, y);
+			}
 		}
-	}
-	// Update the current field with the newly computed one
-	for (int x = 0; x < w->w; x++) {
-		for (int y = 0; y < w->h; y++) {
-			// FIXME This breaks when fully syncronus, why?
-			//w->field_e[x][y] = w->field_e_next[x][y];
-			//w->field_b[x][y] = w->field_b_next[x][y];
+		for (int x = 0; x < w->w; x++) {
+			for (int y = 0; y < w->h; y++) {
+				w->field_b[x][y] = w->field_b_next[x][y];
+			}
 		}
+		// Update the electric field
+		for (int x = 0; x < w->w; x++) {
+			for (int y = 0; y < w->h; y++) {
+				calculate_ex_at(w, dt, x, y);
+				calculate_ey_at(w, dt, x, y);
+			}
+		}
+		// Update the current fields with the newly computed one
+		for (int x = 0; x < w->w; x++) {
+			for (int y = 0; y < w->h; y++) {
+				w->field_e[x][y] = w->field_e_next[x][y];
+			}
+		}
+	} else {
+		for (int x = 0; x < w->w; x++) {
+			for (int y = 0; y < w->h; y++) {
+				calculate_ex_at(w, dt, x, y);
+				calculate_ey_at(w, dt, x, y);
+				w->field_e[x][y] = w->field_e_next[x][y];
+				calculate_b_at(w, dt, x, y);
+				w->field_b[x][y] = w->field_b_next[x][y];
+			}
+		}
+
 	}
 	// Ohms law, this is at the end so that other code can modify currents during a step
 	for (int x = 0; x < w->w; x++) {
