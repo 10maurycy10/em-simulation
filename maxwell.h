@@ -24,6 +24,9 @@
 // Each cell in the grid has a B field value and and 2 E field comonents.
 // These values are stagered in space to allow computing the needed diriverates easly
 typedef struct World {
+	// Obsolete, does nothing
+	int sync;
+
 	// Width hieght and spacing
 	int w, h;
 	float spacing;
