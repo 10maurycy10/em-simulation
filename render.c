@@ -1,5 +1,6 @@
 #include "render.h"
 #include <assert.h>
+#include <SDL2/SDL_image.h>
 
 // Open a window an create a Window stuct
 Window window_open(int w, int h) {
@@ -27,10 +28,24 @@ Window window_open(int w, int h) {
 	return (Window) {
 		.window = window,
 		.w = 640,
+		.frame = 0,
 		.h = 480,
 		.renderer = renderer,
 		.canvas = NULL,
 		.canvas_texture = NULL,
+	};
+}
+
+Window window_open_file(char* target) {
+	return (Window) {
+		.window = NULL,
+		.canvas = 0,
+		.w = 0,
+		.h = 0,
+		.frame = 0,
+		.renderer = NULL,
+		.canvas_texture = NULL,
+		.target = target
 	};
 }
 
@@ -47,24 +62,39 @@ void renderer_setup(Window* window, int w, int h) {
 	
 	window->canvas = SDL_CreateRGBSurface(0, w, h, 32, 0xff000000, 0x00ff0000, 0x0000ff00, 0x000000ff);
 	assert(window->canvas);
-	window->canvas_texture = SDL_CreateTexture(window->renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, w, h);
-	assert(window->canvas_texture);
+	
+	if (window->renderer) {
+		window->canvas_texture = SDL_CreateTexture(window->renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, w, h);
+		assert(window->canvas_texture);
+	}
 }
 
 // Show the graphics draw in the pixel buffer to the screen
 void window_present(Window* window) {
-	// Copy rendered graphics to the to the gpu
-	void* texture_pixels;
-	int texture_pitch;
-	SDL_LockTexture(window->canvas_texture, NULL, &texture_pixels, &texture_pitch);
-	memcpy(texture_pixels, window->canvas->pixels, window->canvas->pitch * window->canvas->h);
-	SDL_UnlockTexture(window->canvas_texture);
-
-	// Draw the texture onto the renderer 
-	SDL_RenderCopy(window->renderer, window->canvas_texture, NULL, NULL);
+	if (window->renderer) {
+		// Copy rendered graphics to the to the gpu
+		void* texture_pixels;
+		int texture_pitch;
+		SDL_LockTexture(window->canvas_texture, NULL, &texture_pixels, &texture_pitch);
+		memcpy(texture_pixels, window->canvas->pixels, window->canvas->pitch * window->canvas->h);
+		SDL_UnlockTexture(window->canvas_texture);
+		
+		// Draw the texture onto the renderer 
+		SDL_RenderCopy(window->renderer, window->canvas_texture, NULL, NULL);
 	
-	// Present the renderer
-	SDL_RenderPresent(window->renderer);
+		// Present the renderer
+		SDL_RenderPresent(window->renderer);
+	}
+
+	if (window->target) {
+		// TODO support large filenames
+		char filename[256];
+		snprintf(filename, 256, "%s%d.png", window->target, window->frame);
+		printf("Saving frame to %s\n", filename);
+		IMG_SavePNG(window->canvas, filename);
+	}
+
+	window->frame++;
 }
 
 void set_pixel(Window* window, int x, int y, int r, int g, int b) {
