@@ -1,6 +1,7 @@
 // 2d simulation of maxwells equations
 #include "maxwell.h"
 #include <stdlib.h>
+#include <omp.h>
 
 World empty_world(int width, int h, float spacing) {
 	World w;
@@ -125,17 +126,20 @@ void calculate_b_at(World* w, float dt, int x, int y) {
 void simulate_em(World* w, float dt) {
 	// Stager updates to improve stability
 	// Update the magnetic fidld
+	#pragma omp parallel for
 	for (int x = 0; x < w->w; x++) {
 		for (int y = 0; y < w->h; y++) {
 			calculate_b_at(w, dt, x, y);
 		}
 	}
+	#pragma omp parallel for
 	for (int x = 0; x < w->w; x++) {
 		for (int y = 0; y < w->h; y++) {
 			w->field_b[x][y] = w->field_b_next[x][y];
 		}
 	}
 	// Update the electric field
+	#pragma omp parallel for
 	for (int x = 0; x < w->w; x++) {
 		for (int y = 0; y < w->h; y++) {
 			calculate_ex_at(w, dt, x, y);
@@ -143,12 +147,14 @@ void simulate_em(World* w, float dt) {
 		}
 	}
 	// Update the current fields with the newly computed one
+	#pragma omp parallel for
 	for (int x = 0; x < w->w; x++) {
 		for (int y = 0; y < w->h; y++) {
 			w->field_e[x][y] = w->field_e_next[x][y];
 		}
 	}
 	// Ohms law, this is at the end so that other code can modify currents during a step
+	#pragma omp parallel for
 	for (int x = 0; x < w->w; x++) {
 		for (int y = 0; y < w->h; y++) {
 			w->field_j[x][y] = v2_mul_scaler(w->field_e[x][y], w->conductivity[x][y]);
