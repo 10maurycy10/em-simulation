@@ -107,7 +107,7 @@ int main(int argc, char** argv) {
 				RGB c = COLORGRADE(&w, x,y);
 				#ifdef SHOW_CONDUCTIVITY
 				c.r = (w.conductivity[x][y]*50);
-				/c.g = 0;
+				c.g = 0;
 				c.b = 0;
 				#endif
 				set_pixel(&window, x, y, clamp_to_rgb(c.r), clamp_to_rgb(c.g), clamp_to_rgb(c.b));
